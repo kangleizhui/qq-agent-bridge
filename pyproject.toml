@@ -1,0 +1,49 @@
+[project]
+name = "qq-agent-bridge"
+version = "0.1.0"
+description = "把 QQ（通过 NapCat OneBot v11）接到任意 AI Agent CLI —— Hermes / OpenClaude / Claude Code / OpenAI 兼容 API 一键切换"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "kangleizhui" },
+]
+keywords = ["qq", "onebot", "napcat", "hermes-agent", "openclaude", "claude-code", "llm", "bridge"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "aiohttp>=3.9",
+    "httpx>=0.27",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "ruff>=0.1",
+]
+
+[project.scripts]
+qq-agent-bridge = "qq_agent_bridge.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/kangleizhui/qq-agent-bridge"
+Issues = "https://github.com/kangleizhui/qq-agent-bridge/issues"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"

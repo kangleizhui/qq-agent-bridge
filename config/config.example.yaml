@@ -1,0 +1,100 @@
+# ============================================
+# qq-agent-bridge 配置文件
+# 复制为 config.yaml 后编辑
+# ============================================
+
+# ── OneBot 入口（NapCat 连过来的）──────────────
+onebot:
+  # NapCat 反向 WebSocket（推荐）
+  ws_host: "0.0.0.0"
+  ws_port: 8080
+  ws_path: "/onebot/v11/ws"
+  access_token: "CHANGE_THIS_TOKEN"   # 跟 NapCat 配置一致
+
+  # 机器人自己的 QQ（必填）
+  self_id: "12345678"
+
+# ── 后端 AI 选择 ────────────────────────────
+# 可选: hermes | openclaude | claude-code | openai
+backend: "hermes"
+
+# ── 各后端具体配置（只用到的会生效）────────
+backends:
+
+  # Hermes Agent（CLI）
+  hermes:
+    # Hermes 二进制路径，留空走 PATH
+    binary: "hermes"
+    # 用 hermes ask 一次性问答，还是 hermes session 保持上下文
+    mode: "session"          # session | ask
+    # 额外参数
+    extra_args: []
+    # 工作目录（agent 会在这里执行命令）
+    workdir: "~/qq-agent-workspace"
+
+  # OpenClaude（CLI）
+  openclaude:
+    binary: "openclaude"
+    mode: "session"
+    extra_args: []
+    workdir: "~/qq-agent-workspace"
+
+  # Claude Code CLI
+  claude-code:
+    binary: "claude"
+    extra_args: ["--no-tty"]
+    workdir: "~/qq-agent-workspace"
+
+  # OpenAI 兼容 API（DeepSeek/火山/月之暗面/任何 OpenAI 兼容服务）
+  openai:
+    base_url: "https://api.deepseek.com/v1"
+    api_key: "${OPENAI_API_KEY}"          # 支持环境变量
+    model: "deepseek-chat"
+    system_prompt: "你是一个友好的 QQ 机器人助手，回答要简洁。"
+    temperature: 0.7
+    max_tokens: 2000
+
+# ── 权限：白名单 / 黑名单 ────────────────────
+permissions:
+  # 主人 QQ（拥有全部权限，配置变更需要重启）
+  owners: ["10086"]
+
+  # 白名单：列出的用户/群能调用机器人；空数组 + allow_all=false 表示只许主人
+  allow_all: false
+  whitelist_users: []
+  whitelist_groups: []
+
+  # 黑名单：永远禁止（优先级最高）
+  blacklist_users: []
+  blacklist_groups: []
+
+  # 群里是否必须 @ 才回复
+  group_require_at: true
+
+# ── 会话隔离 ──────────────────────────────
+session:
+  # per_user: 每个用户独立会话
+  # per_group: 每个群一个共享会话
+  # per_chat: 私聊用户 + 每个群都各自独立（默认）
+  scope: "per_chat"
+
+  # 会话超时（秒），超过自动清空上下文
+  timeout: 1800
+
+  # 每个会话保留最近多少轮对话（仅 openai 后端，CLI 后端自己管理）
+  history_turns: 10
+
+# ── 高级 ──────────────────────────────────
+advanced:
+  # 收到消息后多少秒内不重复触发（防刷屏）
+  rate_limit_seconds: 1
+
+  # 同时最多并发处理几条消息
+  max_concurrent: 5
+
+  # 输出超长怎么办：truncate / split / file
+  long_output: "split"
+  long_output_threshold: 2000
+
+  # 日志级别
+  log_level: "INFO"
