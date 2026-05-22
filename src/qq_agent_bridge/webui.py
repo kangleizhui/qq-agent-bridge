@@ -88,8 +88,12 @@ class WebUIServer:
         app.router.add_get(f"{prefix}/api/sessions", self._require_auth(self._api_sessions))
         app.router.add_post(f"{prefix}/api/sessions/reset", self._require_auth(self._api_reset_session))
         app.router.add_get(f"{prefix}/api/config", self._require_auth(self._api_get_config))
+        app.router.add_get(f"{prefix}/api/config/raw", self._require_auth(self._api_get_config_raw))
         app.router.add_post(f"{prefix}/api/config", self._require_auth(self._api_save_config))
         app.router.add_post(f"{prefix}/api/test", self._require_auth(self._api_test))
+        app.router.add_post(f"{prefix}/api/restart", self._require_auth(self._api_restart))
+        app.router.add_post(f"{prefix}/api/reload", self._require_auth(self._api_reload))
+        app.router.add_get(f"{prefix}/api/napcat-snippet", self._require_auth(self._api_napcat_snippet))
 
     # ── 页面 ────────────────────────────────
     async def _index(self, request: web.Request) -> web.Response:
@@ -158,12 +162,98 @@ class WebUIServer:
         return web.json_response(cfg)
 
     async def _api_save_config(self, request: web.Request) -> web.Response:
-        # 实现：写回 config.yaml + 标记需要重启
+        """保存配置到 config.yaml（合并：脱敏字段不覆盖）"""
         import yaml
         data = await request.json()
+        section = data.get("section")  # backend / onebot / permissions / webui
+        payload = data.get("payload", {})
+        if section not in ("backend", "onebot", "permissions", "webui"):
+            return web.json_response({"ok": False, "error": "section must be backend/onebot/permissions/webui"}, status=400)
+
         config_path = os.environ.get("QAB_CONFIG", "./config/config.yaml")
-        # TODO: 校验 + 合并已脱敏字段
-        return web.json_response({"ok": False, "error": "在线改配置 v0.2 实现，请直接编辑 config.yaml + 重启服务"})
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                current = yaml.safe_load(f) or {}
+        except FileNotFoundError:
+            return web.json_response({"ok": False, "error": f"config file not found: {config_path}"}, status=500)
+
+        if section == "backend":
+            current["backend"] = payload.get("name", current.get("backend", "openai"))
+            bname = current["backend"]
+            current.setdefault("backends", {})
+            old_backend = current["backends"].get(bname, {})
+            new_backend = payload.get("config", old_backend)
+            # 如果传来的 api_key 是 ***，保留旧的
+            if new_backend.get("api_key") == "***" and old_backend.get("api_key"):
+                new_backend["api_key"] = old_backend["api_key"]
+            current["backends"][bname] = new_backend
+        elif section == "onebot":
+            old_token = current.get("onebot", {}).get("access_token", "")
+            current.setdefault("onebot", {}).update(payload)
+            # 如果传来的 access_token 是 ***，保留旧的
+            if current["onebot"].get("access_token") == "***" and old_token:
+                current["onebot"]["access_token"] = old_token
+        elif section == "permissions":
+            current["permissions"] = payload
+        elif section == "webui":
+            current["webui"] = payload
+
+        with open(config_path, "w", encoding="utf-8") as f:
+            yaml.dump(current, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+
+        self.bridge.config = current
+        return web.json_response({"ok": True, "message": "配置已保存，需重启或热重载生效"})
+
+    async def _api_get_config_raw(self, request: web.Request) -> web.Response:
+        """返回完整配置（脱敏）—— 前端表单用"""
+        return web.json_response(self._masked_config())
+
+    def _masked_config(self) -> dict:
+        import copy
+        cfg = copy.deepcopy(self.bridge.config)
+        if "onebot" in cfg and cfg["onebot"].get("access_token"):
+            cfg["onebot"]["access_token"] = "***"
+        for bname, bcfg in cfg.get("backends", {}).items():
+            if isinstance(bcfg, dict) and "api_key" in bcfg:
+                bcfg["api_key"] = "***"
+        return cfg
+
+    async def _api_restart(self, request: web.Request) -> web.Response:
+        """重启进程（systemd 拉起 / 直接 os.execv）"""
+        import sys
+        log.warning("WebUI 触发进程重启")
+        # 先写配置落盘
+        os._exit(0)  # systemd 会自动拉起；如果不是 systemd 则进程直接退出
+        return web.json_response({"ok": True})  # unreachable
+
+    async def _api_reload(self, request: web.Request) -> web.Response:
+        """热重载后端（重建 backend 实例，OneBot 连接不断）"""
+        try:
+            await self.bridge.backend.shutdown()
+            from .backends import create_backend
+            self.bridge.backend = create_backend(self.bridge.config.get("backend", "openai"), self.bridge.config)
+            await self.bridge.backend.start()
+            log.info("WebUI 热重载后端完成: %s", self.bridge.backend.name)
+            return web.json_response({"ok": True, "backend": self.bridge.backend.name})
+        except Exception as e:
+            log.exception("热重载失败")
+            return web.json_response({"ok": False, "error": str(e)}, status=500)
+
+    async def _api_napcat_snippet(self, request: web.Request) -> web.Response:
+        """生成 NapCat 反向 WS 配置片段"""
+        cfg = self.bridge.config.get("onebot", {})
+        snippet = {
+            "name": "to-qq-agent-bridge",
+            "enable": True,
+            "url": f"ws://{cfg.get('ws_host', '127.0.0.1')}:{cfg.get('ws_port', 8080)}{cfg.get('ws_path', '/onebot/v11/ws')}",
+            "messagePostFormat": "array",
+            "reportSelfMessage": False,
+            "token": cfg.get("access_token", ""),
+            "reconnectInterval": 5000,
+            "heartInterval": 30000,
+            "debug": False,
+        }
+        return web.json_response({"snippet": snippet, "config_path_hint": "/root/Napcat/opt/QQ/resources/app/app_launcher/napcat/config/onebot11_<BOT_QQ>.json"})
 
     async def _api_test(self, request: web.Request) -> web.Response:
         """让 webui 测试一下后端能不能调通"""

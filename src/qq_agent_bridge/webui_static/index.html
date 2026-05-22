@@ -19,30 +19,22 @@
   ::-webkit-scrollbar-track { background: #1e1e2e; }
   ::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
   .pulse-dot { animation: pulse 2s infinite; }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
-  .fade-in { animation: fadeIn 0.3s ease-in; }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .fade-in { animation: fadeIn .3s ease-in; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .tab-active { border-bottom: 2px solid #6366f1; color: #a5b4fc; }
+  .tab-inactive { border-bottom: 2px solid transparent; color: #6b7280; }
+  .tab-inactive:hover { color: #9ca3af; }
+  input, select, textarea { background: #141420 !important; border: 1px solid #2a2a44 !important; color: #e5e7eb !important; }
+  input:focus, select:focus, textarea:focus { border-color: #6366f1 !important; outline: none; }
 </style>
 <script>
-tailwind.config = {
-  darkMode: 'class',
-  theme: {
-    extend: {
-      colors: {
-        dark: { 900: '#0d0d14', 800: '#141420', 700: '#1a1a2e', 600: '#22223a', 500: '#2a2a44' },
-        accent: '#6366f1',
-      }
-    }
-  }
-}
+tailwind.config={darkMode:'class',theme:{extend:{colors:{dark:{900:'#0d0d14',800:'#141420',700:'#1a1a2e',600:'#22223a',500:'#2a2a44'},accent:'#6366f1'}}}}
 </script>
 </head>
 <body class="bg-dark-900 text-gray-200 min-h-screen" x-data="app()" x-init="init()">
 
-<!-- ═══ LOGIN ═══ -->
+<!-- LOGIN -->
 <div x-show="!token" x-transition class="min-h-screen flex items-center justify-center">
   <div class="bg-dark-700 p-8 rounded-2xl glow w-96">
     <div class="text-center mb-8">
@@ -53,25 +45,21 @@ tailwind.config = {
     <form @submit.prevent="login()" class="space-y-4">
       <div>
         <label class="text-xs text-gray-500 uppercase tracking-wider">用户名</label>
-        <input x-model="form.user" type="text" autofocus
-          class="w-full mt-1 px-4 py-2.5 bg-dark-800 border border-dark-500 rounded-lg focus:border-indigo-500 focus:outline-none transition">
+        <input x-model="form.user" type="text" autofocus class="w-full mt-1 px-4 py-2.5 rounded-lg transition">
       </div>
       <div>
         <label class="text-xs text-gray-500 uppercase tracking-wider">密码</label>
-        <input x-model="form.pass" type="password"
-          class="w-full mt-1 px-4 py-2.5 bg-dark-800 border border-dark-500 rounded-lg focus:border-indigo-500 focus:outline-none transition">
+        <input x-model="form.pass" type="password" class="w-full mt-1 px-4 py-2.5 rounded-lg transition">
       </div>
       <div x-show="loginError" x-text="loginError" class="text-red-400 text-sm" x-transition></div>
-      <button type="submit" :disabled="loginLoading"
-        class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-lg font-semibold transition">
-        <span x-show="!loginLoading">登 录</span>
-        <span x-show="loginLoading">⏳</span>
+      <button type="submit" :disabled="loginLoading" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-lg font-semibold transition">
+        <span x-show="!loginLoading">登 录</span><span x-show="loginLoading">⏳</span>
       </button>
     </form>
   </div>
 </div>
 
-<!-- ═══ DASHBOARD ═══ -->
+<!-- DASHBOARD -->
 <div x-show="token" x-transition class="min-h-screen flex flex-col">
 
   <!-- TOP BAR -->
@@ -79,293 +67,330 @@ tailwind.config = {
     <div class="flex items-center gap-3">
       <span class="text-xl">🤖</span>
       <span class="text-lg font-bold text-indigo-400">QAB</span>
-      <span class="text-xs text-gray-500">Dashboard v0.1.0</span>
+      <span class="text-xs text-gray-500">Dashboard</span>
     </div>
     <div class="flex items-center gap-4">
-      <!-- connection indicator -->
       <div class="flex items-center gap-2 text-sm">
-        <span class="w-2 h-2 rounded-full" :class="status.onebot_connected ? 'bg-green-500 glow-green pulse-dot' : 'bg-red-500 glow-red'"></span>
-        <span :class="status.onebot_connected ? 'text-green-400' : 'text-red-400'"
-              x-text="status.onebot_connected ? 'OneBot 已连接' : 'OneBot 未连接'"></span>
+        <span class="w-2 h-2 rounded-full" :class="status.onebot_connected?'bg-green-500 glow-green pulse-dot':'bg-red-500 glow-red'"></span>
+        <span :class="status.onebot_connected?'text-green-400':'text-red-400'" x-text="status.onebot_connected?'OneBot 已连接':'OneBot 未连接'"></span>
       </div>
       <button @click="logout()" class="text-xs text-gray-500 hover:text-red-400 transition">登出</button>
     </div>
   </header>
 
-  <!-- MAIN -->
-  <div class="flex flex-1 overflow-hidden">
+  <!-- TABS -->
+  <nav class="bg-dark-800 border-b border-dark-600 px-6 flex gap-1 shrink-0">
+    <template x-for="t in tabs" :key="t.id">
+      <button @click="tab=t.id" class="px-4 py-2.5 text-sm font-medium transition"
+        :class="tab===t.id?'tab-active':'tab-inactive'" x-text="t.label"></button>
+    </template>
+  </nav>
 
-    <!-- LEFT: Status + Sessions -->
-    <aside class="w-72 bg-dark-800 border-r border-dark-600 flex flex-col shrink-0 overflow-y-auto">
-      <!-- STATUS CARDS -->
-      <div class="p-4 space-y-3">
-        <h2 class="text-xs text-gray-500 uppercase tracking-wider mb-2">系 统 状 态</h2>
+  <!-- TAB CONTENT -->
+  <div class="flex-1 overflow-y-auto">
 
-        <div class="bg-dark-700 rounded-xl p-3 space-y-2">
-          <div class="flex justify-between text-sm">
-            <span class="text-gray-400">后端</span>
-            <span class="text-indigo-400 font-semibold" x-text="status.backend || '—'"></span>
-          </div>
-          <div class="flex justify-between text-sm">
-            <span class="text-gray-400">Bot QQ</span>
-            <span class="text-gray-200" x-text="status.self_id || '—'"></span>
-          </div>
-          <div class="flex justify-between text-sm">
-            <span class="text-gray-400">活跃会话</span>
-            <span class="text-cyan-400 font-semibold" x-text="status.session_count ?? '—'"></span>
-          </div>
-          <div class="flex justify-between text-sm">
-            <span class="text-gray-400">运行时间</span>
-            <span class="text-gray-200" x-text="fmtDuration(status.uptime_seconds)"></span>
-          </div>
+    <!-- ═══ TAB: 概览 ═══ -->
+    <div x-show="tab==='overview'" class="p-6 space-y-4">
+      <div class="grid grid-cols-4 gap-4">
+        <div class="bg-dark-700 rounded-xl p-4">
+          <div class="text-xs text-gray-500 mb-1">后端</div>
+          <div class="text-xl font-bold text-indigo-400" x-text="status.backend||'—'"></div>
+        </div>
+        <div class="bg-dark-700 rounded-xl p-4">
+          <div class="text-xs text-gray-500 mb-1">Bot QQ</div>
+          <div class="text-xl font-bold text-cyan-400" x-text="status.self_id||'—'"></div>
+        </div>
+        <div class="bg-dark-700 rounded-xl p-4">
+          <div class="text-xs text-gray-500 mb-1">活跃会话</div>
+          <div class="text-xl font-bold text-purple-400" x-text="status.session_count??'—'"></div>
+        </div>
+        <div class="bg-dark-700 rounded-xl p-4">
+          <div class="text-xs text-gray-500 mb-1">运行时间</div>
+          <div class="text-xl font-bold text-green-400" x-text="fmtDuration(status.uptime_seconds)"></div>
         </div>
       </div>
 
-      <!-- SESSIONS -->
-      <div class="p-4 flex-1 overflow-y-auto">
-        <h2 class="text-xs text-gray-500 uppercase tracking-wider mb-2">会 话 列 表</h2>
-        <template x-for="s in sessions" :key="s.key">
-          <div class="bg-dark-700 rounded-lg p-2.5 mb-2 hover:bg-dark-600 transition cursor-default group">
-            <div class="flex justify-between items-center">
-              <span class="text-xs text-gray-300 truncate flex-1" x-text="s.key"></span>
-              <button @click="resetSession(s.key)" class="text-xs text-gray-600 group-hover:text-red-400 transition ml-2"
-                      title="重置此会话">✕</button>
-            </div>
-            <div class="flex gap-3 mt-1 text-xs text-gray-500">
-              <span x-text="s.turns + ' 轮'"></span>
-              <span x-text="s.history_size + ' 条历史'"></span>
-              <span x-text="fmtTime(s.last_active)"></span>
-            </div>
-          </div>
-        </template>
-        <div x-show="sessions.length === 0" class="text-xs text-gray-600 text-center py-4">暂无活跃会话</div>
-      </div>
-    </aside>
-
-    <!-- CENTER: Message Stream -->
-    <main class="flex-1 flex flex-col overflow-hidden">
-      <div class="px-4 py-2 border-b border-dark-600 flex items-center justify-between shrink-0">
-        <h2 class="text-xs text-gray-500 uppercase tracking-wider">实 时 消 息 流</h2>
-        <div class="flex items-center gap-3">
-          <span class="text-xs text-gray-600" x-text="messages.length + ' 条'"></span>
-          <button @click="messages=[]" class="text-xs text-gray-600 hover:text-red-400 transition">清空</button>
+      <!-- Messages -->
+      <div class="bg-dark-700 rounded-xl">
+        <div class="px-4 py-2 border-b border-dark-600 flex justify-between items-center">
+          <span class="text-xs text-gray-500 uppercase tracking-wider">实时消息流</span>
+          <div class="flex gap-2"><span class="text-xs text-gray-600" x-text="messages.length+' 条'"></span><button @click="messages=[]" class="text-xs text-gray-600 hover:text-red-400">清空</button></div>
         </div>
-      </div>
-      <div x-ref="msgBox" class="flex-1 overflow-y-auto p-4 space-y-2">
-        <template x-for="(m, i) in messages" :key="i">
-          <div class="rounded-lg p-3 text-sm fade-in"
-               :class="m.direction === 'in' ? 'msg-in bg-dark-700' : m.direction === 'err' ? 'msg-err bg-dark-700' : 'msg-out bg-dark-700'">
-            <div class="flex justify-between items-center mb-1">
-              <span class="text-xs font-semibold"
-                    :class="m.direction === 'in' ? 'text-indigo-400' : m.direction === 'err' ? 'text-red-400' : 'text-green-400'"
-                    x-text="m.direction === 'in' ? '← ' + (m.user || 'user') : m.direction === 'err' ? '⚠ ERROR' : '→ bot'"></span>
-              <span class="text-xs text-gray-600" x-text="fmtTime(m.ts)"></span>
+        <div x-ref="msgBox" class="h-64 overflow-y-auto p-4 space-y-2">
+          <template x-for="(m,i) in messages" :key="i">
+            <div class="rounded-lg p-2.5 text-sm fade-in" :class="m.direction==='in'?'msg-in bg-dark-800':m.direction==='err'?'msg-err bg-dark-800':'msg-out bg-dark-800'">
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-xs font-semibold" :class="m.direction==='in'?'text-indigo-400':m.direction==='err'?'text-red-400':'text-green-400'" x-text="m.direction==='in'?'← '+(m.user||'user'):m.direction==='err'?'⚠ ERROR':'→ bot'"></span>
+                <span class="text-xs text-gray-600" x-text="fmtTime(m.ts)"></span>
+              </div>
+              <div class="text-gray-300 whitespace-pre-wrap break-all text-xs" x-text="m.text"></div>
             </div>
-            <div class="text-gray-300 whitespace-pre-wrap break-all" x-text="m.text"></div>
-          </div>
-        </template>
-        <div x-show="messages.length === 0" class="text-center text-gray-600 text-sm py-20">
-          等待消息中…<br><span class="text-xs">通过 QQ 给机器人发条消息试试</span>
+          </template>
+          <div x-show="messages.length===0" class="text-center text-gray-600 text-sm py-16">等待消息中…</div>
         </div>
       </div>
 
-      <!-- TEST BAR -->
-      <div class="border-t border-dark-600 p-3 shrink-0">
+      <!-- Test bar -->
+      <div class="bg-dark-700 rounded-xl p-3">
         <form @submit.prevent="sendTest()" class="flex gap-2">
-          <input x-model="testMsg" type="text" placeholder="测试发送消息…"
-            class="flex-1 px-4 py-2 bg-dark-800 border border-dark-500 rounded-lg text-sm focus:border-indigo-500 focus:outline-none transition">
-          <button type="submit" :disabled="testLoading"
-            class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-lg text-sm font-semibold transition">
-            <span x-show="!testLoading">发送</span>
-            <span x-show="testLoading">⏳</span>
+          <input x-model="testMsg" type="text" placeholder="测试发送消息…" class="flex-1 px-4 py-2 rounded-lg text-sm">
+          <button type="submit" :disabled="testLoading" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-lg text-sm font-semibold transition">
+            <span x-show="!testLoading">发送</span><span x-show="testLoading">⏳</span>
           </button>
         </form>
-        <div x-show="testResult" x-text="testResult" class="mt-2 text-xs p-2 rounded-lg"
-             :class="testOk ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'" x-transition></div>
+        <div x-show="testResult" x-text="testResult" class="mt-2 text-xs p-2 rounded-lg" :class="testOk?'bg-green-900/30 text-green-400':'bg-red-900/30 text-red-400'" x-transition></div>
       </div>
-    </main>
+    </div>
 
-    <!-- RIGHT: Config -->
-    <aside class="w-80 bg-dark-800 border-l border-dark-600 flex flex-col shrink-0 overflow-y-auto">
-      <div class="px-4 py-2 border-b border-dark-600">
-        <h2 class="text-xs text-gray-500 uppercase tracking-wider">配 置 查 看</h2>
-      </div>
-      <div class="p-4 flex-1 overflow-y-auto">
-        <template x-for="(val, key) in flatConfig" :key="key">
-          <div class="mb-2">
-            <span class="text-xs text-gray-500" x-text="key"></span>
-            <div class="text-sm text-gray-300 mt-0.5 break-all" x-text="val"></div>
+    <!-- ═══ TAB: 后端配置 ═══ -->
+    <div x-show="tab==='backend'" class="p-6 max-w-2xl space-y-4">
+      <div class="bg-dark-700 rounded-xl p-5 space-y-4">
+        <h3 class="text-sm font-bold text-indigo-400">选择后端</h3>
+        <div>
+          <label class="text-xs text-gray-500">后端类型</label>
+          <select x-model="beForm.name" @change="onBackendChange()" class="w-full mt-1 px-4 py-2.5 rounded-lg">
+            <option value="openai">OpenAI 兼容 API（DeepSeek / 火山 / 月之暗面…）</option>
+            <option value="hermes">Hermes Agent（CLI）</option>
+            <option value="openclaude">OpenClaude（CLI）</option>
+            <option value="claude-code">Claude Code（CLI）</option>
+          </select>
+        </div>
+
+        <!-- OpenAI backend fields -->
+        <div x-show="beForm.name==='openai'" class="space-y-3">
+          <div><label class="text-xs text-gray-500">Base URL</label>
+            <input x-model="beForm.config.base_url" type="text" placeholder="https://api.openai.com/v1" class="w-full mt-1 px-4 py-2 rounded-lg text-sm"></div>
+          <div><label class="text-xs text-gray-500">API Key</label>
+            <input x-model="beForm.config.api_key" type="password" placeholder="sk-xxx 或 ${ENV_VAR}" class="w-full mt-1 px-4 py-2 rounded-lg text-sm"></div>
+          <div><label class="text-xs text-gray-500">Model</label>
+            <input x-model="beForm.config.model" type="text" placeholder="gpt-4o-mini" class="w-full mt-1 px-4 py-2 rounded-lg text-sm"></div>
+          <div><label class="text-xs text-gray-500">System Prompt</label>
+            <textarea x-model="beForm.config.system_prompt" rows="2" class="w-full mt-1 px-4 py-2 rounded-lg text-sm"></textarea></div>
+          <div class="grid grid-cols-2 gap-3">
+            <div><label class="text-xs text-gray-500">Temperature</label>
+              <input x-model="beForm.config.temperature" type="number" step="0.1" class="w-full mt-1 px-4 py-2 rounded-lg text-sm"></div>
+            <div><label class="text-xs text-gray-500">Max Tokens</label>
+              <input x-model="beForm.config.max_tokens" type="number" class="w-full mt-1 px-4 py-2 rounded-lg text-sm"></div>
           </div>
-        </template>
-        <div x-show="Object.keys(flatConfig).length === 0" class="text-xs text-gray-600 text-center py-4">加载中…</div>
-      </div>
-    </aside>
+        </div>
 
+        <!-- CLI backend fields -->
+        <div x-show="beForm.name==='hermes'||beForm.name==='openclaude'||beForm.name==='claude-code'" class="space-y-3">
+          <div><label class="text-xs text-gray-500">二进制路径</label>
+            <input x-model="beForm.config.binary" type="text" :placeholder="beForm.name" class="w-full mt-1 px-4 py-2 rounded-lg text-sm"></div>
+          <div x-show="beForm.name!=='claude-code'"><label class="text-xs text-gray-500">模式</label>
+            <select x-model="beForm.config.mode" class="w-full mt-1 px-4 py-2 rounded-lg text-sm">
+              <option value="session">session（保持上下文）</option><option value="ask">ask（一次性）</option>
+            </select></div>
+          <div><label class="text-xs text-gray-500">工作目录</label>
+            <input x-model="beForm.config.workdir" type="text" placeholder="~/qq-agent-workspace" class="w-full mt-1 px-4 py-2 rounded-lg text-sm"></div>
+        </div>
+
+        <button @click="saveBackend()" :disabled="saving" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-lg text-sm font-semibold transition">
+          <span x-show="!saving">💾 保存后端配置</span><span x-show="saving">⏳ 保存中…</span>
+        </button>
+        <div x-show="saveMsg" x-text="saveMsg" class="text-xs p-2 rounded-lg" :class="saveOk?'bg-green-900/30 text-green-400':'bg-red-900/30 text-red-400'" x-transition></div>
+      </div>
+    </div>
+
+    <!-- ═══ TAB: 连接配置 ═══ -->
+    <div x-show="tab==='onebot'" class="p-6 max-w-2xl space-y-4">
+      <div class="bg-dark-700 rounded-xl p-5 space-y-4">
+        <h3 class="text-sm font-bold text-indigo-400">OneBot 连接设置</h3>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="text-xs text-gray-500">WS Host</label>
+            <input x-model="obForm.ws_host" type="text" class="w-full mt-1 px-4 py-2 rounded-lg text-sm"></div>
+          <div><label class="text-xs text-gray-500">WS Port</label>
+            <input x-model="obForm.ws_port" type="number" class="w-full mt-1 px-4 py-2 rounded-lg text-sm"></div>
+        </div>
+        <div><label class="text-xs text-gray-500">WS Path</label>
+          <input x-model="obForm.ws_path" type="text" class="w-full mt-1 px-4 py-2 rounded-lg text-sm"></div>
+        <div><label class="text-xs text-gray-500">Access Token</label>
+          <input x-model="obForm.access_token" type="password" class="w-full mt-1 px-4 py-2 rounded-lg text-sm"></div>
+        <div><label class="text-xs text-gray-500">Bot QQ 号</label>
+          <input x-model="obForm.self_id" type="text" class="w-full mt-1 px-4 py-2 rounded-lg text-sm"></div>
+        <button @click="saveOnebot()" :disabled="saving" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-lg text-sm font-semibold transition">
+          <span x-show="!saving">💾 保存连接配置</span><span x-show="saving">⏳</span>
+        </button>
+        <div x-show="saveMsg" x-text="saveMsg" class="text-xs p-2 rounded-lg" :class="saveOk?'bg-green-900/30 text-green-400':'bg-red-900/30 text-red-400'" x-transition></div>
+      </div>
+
+      <!-- NapCat snippet -->
+      <div class="bg-dark-700 rounded-xl p-5 space-y-3">
+        <h3 class="text-sm font-bold text-green-400">📋 NapCat 反连配置</h3>
+        <p class="text-xs text-gray-500">一键生成 NapCat websocketClients 配置片段，粘贴到 NapCat 的 onebot11_&lt;QQ&gt;.json 即可</p>
+        <button @click="genNapcat()" class="px-4 py-2 bg-green-700 hover:bg-green-600 rounded-lg text-sm font-semibold transition">生成配置片段</button>
+        <div x-show="napcatSnippet" class="relative">
+          <pre class="bg-dark-800 rounded-lg p-3 text-xs text-green-300 overflow-x-auto" x-text="JSON.stringify(napcatSnippet, null, 2)"></pre>
+          <button @click="copyText(JSON.stringify(napcatSnippet,null,2))" class="absolute top-2 right-2 text-xs bg-dark-600 px-2 py-1 rounded hover:bg-dark-500 transition">复制</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ TAB: 权限管理 ═══ -->
+    <div x-show="tab==='permissions'" class="p-6 max-w-2xl space-y-4">
+      <div class="bg-dark-700 rounded-xl p-5 space-y-4">
+        <h3 class="text-sm font-bold text-indigo-400">权限设置</h3>
+        <div><label class="text-xs text-gray-500">主人 QQ（多个用逗号分隔）</label>
+          <input x-model="permForm.owners" type="text" class="w-full mt-1 px-4 py-2 rounded-lg text-sm"></div>
+        <div class="flex items-center gap-3">
+          <input x-model="permForm.allow_all" type="checkbox" class="accent-indigo-500">
+          <label class="text-sm">允许所有人使用（allow_all）</label>
+        </div>
+        <div><label class="text-xs text-gray-500">白名单用户 QQ（逗号分隔）</label>
+          <input x-model="permForm.whitelist_users" type="text" class="w-full mt-1 px-4 py-2 rounded-lg text-sm"></div>
+        <div><label class="text-xs text-gray-500">白名单群号（逗号分隔）</label>
+          <input x-model="permForm.whitelist_groups" type="text" class="w-full mt-1 px-4 py-2 rounded-lg text-sm"></div>
+        <div><label class="text-xs text-gray-500">黑名单用户 QQ（逗号分隔）</label>
+          <input x-model="permForm.blacklist_users" type="text" class="w-full mt-1 px-4 py-2 rounded-lg text-sm"></div>
+        <div><label class="text-xs text-gray-500">黑名单群号（逗号分隔）</label>
+          <input x-model="permForm.blacklist_groups" type="text" class="w-full mt-1 px-4 py-2 rounded-lg text-sm"></div>
+        <div class="flex items-center gap-3">
+          <input x-model="permForm.group_require_at" type="checkbox" class="accent-indigo-500">
+          <label class="text-sm">群里必须 @ 机器人才回复</label>
+        </div>
+        <button @click="savePerms()" :disabled="saving" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-lg text-sm font-semibold transition">
+          <span x-show="!saving">💾 保存权限配置</span><span x-show="saving">⏳</span>
+        </button>
+        <div x-show="saveMsg" x-text="saveMsg" class="text-xs p-2 rounded-lg" :class="saveOk?'bg-green-900/30 text-green-400':'bg-red-900/30 text-red-400'" x-transition></div>
+      </div>
+    </div>
+
+    <!-- ═══ TAB: 会话 ═══ -->
+    <div x-show="tab==='sessions'" class="p-6 max-w-2xl space-y-3">
+      <div class="flex justify-between items-center">
+        <h3 class="text-sm font-bold text-indigo-400">活跃会话</h3>
+        <span class="text-xs text-gray-500" x-text="sessions.length+' 个'"></span>
+      </div>
+      <template x-for="s in sessions" :key="s.key">
+        <div class="bg-dark-700 rounded-lg p-3 hover:bg-dark-600 transition group">
+          <div class="flex justify-between items-center">
+            <span class="text-sm text-gray-300 truncate flex-1" x-text="s.key"></span>
+            <button @click="resetSession(s.key)" class="text-xs text-gray-600 group-hover:text-red-400 transition ml-2 px-2 py-1 bg-dark-600 rounded">重置</button>
+          </div>
+          <div class="flex gap-3 mt-1 text-xs text-gray-500">
+            <span x-text="s.turns+' 轮'"></span>
+            <span x-text="s.history_size+' 条历史'"></span>
+            <span x-text="fmtTime(s.last_active)"></span>
+          </div>
+        </div>
+      </template>
+      <div x-show="sessions.length===0" class="text-center text-gray-600 text-sm py-8">暂无活跃会话</div>
+    </div>
+
+  </div>
+
+  <!-- BOTTOM BAR: Apply buttons -->
+  <div x-show="needApply" class="bg-dark-800 border-t border-dark-600 px-6 py-3 flex items-center justify-between shrink-0">
+    <span class="text-sm text-yellow-400">⚠ 配置已保存但未生效</span>
+    <div class="flex gap-3">
+      <button @click="hotReload()" class="px-4 py-2 bg-yellow-700 hover:bg-yellow-600 rounded-lg text-sm font-semibold transition">🔄 热重载（仅后端）</button>
+      <button @click="fullRestart()" class="px-4 py-2 bg-red-700 hover:bg-red-600 rounded-lg text-sm font-semibold transition">♻ 重启进程（全部生效）</button>
+      <button @click="needApply=false" class="px-4 py-2 bg-dark-600 hover:bg-dark-500 rounded-lg text-sm transition">稍后手动重启</button>
+    </div>
   </div>
 </div>
 
 <script>
-function app() {
+function app(){
   return {
-    token: localStorage.getItem('qab_token') || '',
-    form: { user: '', pass: '' },
-    loginLoading: false,
-    loginError: '',
-    status: {},
-    messages: [],
-    sessions: [],
-    flatConfig: {},
-    testMsg: '',
-    testLoading: false,
-    testResult: '',
-    testOk: false,
-    _pollTimer: null,
+    token: localStorage.getItem('qab_token')||'',
+    form:{user:'',pass:''}, loginLoading:false, loginError:'',
+    tab:'overview',
+    tabs:[
+      {id:'overview',label:'📊 概览'},
+      {id:'backend',label:'⚡ 后端配置'},
+      {id:'onebot',label:'🔗 连接配置'},
+      {id:'permissions',label:'🔒 权限管理'},
+      {id:'sessions',label:'💬 会话'},
+    ],
+    status:{}, messages:[], sessions:[],
+    beForm:{name:'openai',config:{base_url:'',api_key:'',model:'',system_prompt:'',temperature:0.7,max_tokens:2000,binary:'',mode:'session',workdir:'~/qq-agent-workspace'}},
+    obForm:{ws_host:'0.0.0.0',ws_port:8080,ws_path:'/onebot/v11/ws',access_token:'',self_id:''},
+    permForm:{owners:'',allow_all:false,whitelist_users:'',whitelist_groups:'',blacklist_users:'',blacklist_groups:'',group_require_at:true},
+    napcatSnippet:null,
+    testMsg:'',testLoading:false,testResult:'',testOk:false,
+    saving:false,saveMsg:'',saveOk:false,needApply:false,
+    _poll:null,
 
-    async init() {
-      if (this.token) {
-        const ok = await this.fetchStatus();
-        if (!ok) { this.token = ''; localStorage.removeItem('qab_token'); return; }
-        this.startPolling();
-      }
+    async init(){
+      if(this.token){const ok=await this.fetchStatus();if(!ok){this.token='';localStorage.removeItem('qab_token');return;}this.startPolling();}
+    },
+    api(p){return'/webui/api'+p},
+    headers(){return{Authorization:'Bearer '+this.token,'Content-Type':'application/json'}},
+
+    async login(){
+      this.loginLoading=true;this.loginError='';
+      try{const r=await fetch(this.api('/login'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:this.form.user,password:this.form.pass})});
+      const d=await r.json();if(d.ok){this.token=d.token;localStorage.setItem('qab_token',d.token);this.startPolling();}else this.loginError=d.error||'登录失败';}
+      catch(e){this.loginError='网络错误';}this.loginLoading=false;
+    },
+    logout(){this.token='';localStorage.removeItem('qab_token');this.stopPolling();},
+    async fetchStatus(){try{const r=await fetch(this.api('/status'),{headers:this.headers()});if(r.status===401)return false;this.status=await r.json();return true;}catch{return false;}},
+    async fetchMessages(){try{const r=await fetch(this.api('/messages?limit=50'),{headers:this.headers()});if(r.ok){const d=await r.json();const prev=this.messages.length;this.messages=(d.messages||[]).map(m=>({ts:m.ts,direction:m.direction||'in',user:m.user||'',text:m.text||''}));if(this.messages.length>prev)this.$nextTick(()=>{if(this.$refs.msgBox)this.$refs.msgBox.scrollTop=this.$refs.msgBox.scrollHeight;});}}catch{}},
+    async fetchSessions(){try{const r=await fetch(this.api('/sessions'),{headers:this.headers()});if(r.ok)this.sessions=(await r.json()).sessions||[];}catch{}},
+    async fetchConfigRaw(){
+      try{const r=await fetch(this.api('/config/raw'),{headers:this.headers()});if(r.ok){
+        const d=await r.json();
+        // Backend form
+        this.beForm.name=d.backend||'openai';
+        const bc=d.backends?.[this.beForm.name]||{};
+        this.beForm.config={base_url:bc.base_url||'',api_key:bc.api_key||'',model:bc.model||'',system_prompt:bc.system_prompt||'',temperature:bc.temperature??0.7,max_tokens:bc.max_tokens??2000,binary:bc.binary||'',mode:bc.mode||'session',workdir:bc.workdir||'~/qq-agent-workspace'};
+        // Onebot form
+        const ob=d.onebot||{};
+        this.obForm={ws_host:ob.ws_host||'0.0.0.0',ws_port:ob.ws_port||8080,ws_path:ob.ws_path||'/onebot/v11/ws',access_token:ob.access_token||'',self_id:ob.self_id||''};
+        // Perms form
+        const pm=d.permissions||{};
+        this.permForm={owners:(pm.owners||[]).join(', '),allow_all:pm.allow_all||false,whitelist_users:(pm.whitelist_users||[]).join(', '),whitelist_groups:(pm.whitelist_groups||[]).join(', '),blacklist_users:(pm.blacklist_users||[]).join(', '),blacklist_groups:(pm.blacklist_groups||[]).join(', '),group_require_at:pm.group_require_at!==false};
+      }}catch{}
     },
 
-    api(path) { return '/webui/api' + path; },
-    headers() { return { 'Authorization': 'Bearer ' + this.token, 'Content-Type': 'application/json' }; },
-
-    async login() {
-      this.loginLoading = true;
-      this.loginError = '';
-      try {
-        const r = await fetch(this.api('/login'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: this.form.user, password: this.form.pass })
-        });
-        const d = await r.json();
-        if (d.ok) {
-          this.token = d.token;
-          localStorage.setItem('qab_token', d.token);
-          this.startPolling();
-        } else {
-          this.loginError = d.error || '登录失败';
-        }
-      } catch(e) { this.loginError = '网络错误'; }
-      this.loginLoading = false;
+    onBackendChange(){
+      const defaults={openai:{base_url:'https://api.openai.com/v1',api_key:'',model:'gpt-4o-mini',system_prompt:'你是一个QQ机器人助手。',temperature:0.7,max_tokens:2000},hermes:{binary:'hermes',mode:'session',workdir:'~/qq-agent-workspace'},openclaude:{binary:'openclaude',mode:'session',workdir:'~/qq-agent-workspace'},'claude-code':{binary:'claude',workdir:'~/qq-agent-workspace'}};
+      this.beForm.config=defaults[this.beForm.name]||{};
     },
 
-    logout() {
-      this.token = '';
-      localStorage.removeItem('qab_token');
-      this.stopPolling();
+    async saveBackend(){
+      this.saving=true;this.saveMsg='';
+      try{const r=await fetch(this.api('/config'),{method:'POST',headers:this.headers(),body:JSON.stringify({section:'backend',payload:{name:this.beForm.name,config:this.beForm.config}})});
+      const d=await r.json();this.saveOk=d.ok;this.saveMsg=d.ok?'✅ 已保存':'❌ '+(d.error||'保存失败');if(d.ok)this.needApply=true;}
+      catch(e){this.saveOk=false;this.saveMsg='❌ '+e.message;}this.saving=false;
+    },
+    async saveOnebot(){
+      this.saving=true;this.saveMsg='';
+      try{const r=await fetch(this.api('/config'),{method:'POST',headers:this.headers(),body:JSON.stringify({section:'onebot',payload:this.obForm})});
+      const d=await r.json();this.saveOk=d.ok;this.saveMsg=d.ok?'✅ 已保存':'❌ '+(d.error||'保存失败');if(d.ok)this.needApply=true;}
+      catch(e){this.saveOk=false;this.saveMsg='❌ '+e.message;}this.saving=false;
+    },
+    async savePerms(){
+      this.saving=true;this.saveMsg='';
+      const p={owners:this.permForm.owners.split(',').map(s=>s.trim()).filter(Boolean),allow_all:this.permForm.allow_all,whitelist_users:this.permForm.whitelist_users.split(',').map(s=>s.trim()).filter(Boolean),whitelist_groups:this.permForm.whitelist_groups.split(',').map(s=>s.trim()).filter(Boolean),blacklist_users:this.permForm.blacklist_users.split(',').map(s=>s.trim()).filter(Boolean),blacklist_groups:this.permForm.blacklist_groups.split(',').map(s=>s.trim()).filter(Boolean),group_require_at:this.permForm.group_require_at};
+      try{const r=await fetch(this.api('/config'),{method:'POST',headers:this.headers(),body:JSON.stringify({section:'permissions',payload:p})});
+      const d=await r.json();this.saveOk=d.ok;this.saveMsg=d.ok?'✅ 已保存':'❌ '+(d.error||'保存失败');if(d.ok)this.needApply=true;}
+      catch(e){this.saveOk=false;this.saveMsg='❌ '+e.message;}this.saving=false;
+    },
+    async genNapcat(){
+      try{const r=await fetch(this.api('/napcat-snippet'),{headers:this.headers()});if(r.ok){const d=await r.json();this.napcatSnippet=d.snippet;}}catch{}
+    },
+    copyText(t){navigator.clipboard.writeText(t).then(()=>{this.saveMsg='📋 已复制';this.saveOk=true;setTimeout(()=>this.saveMsg='',1500);});},
+
+    async hotReload(){
+      try{const r=await fetch(this.api('/reload'),{method:'POST',headers:this.headers()});const d=await r.json();if(d.ok){this.saveMsg='✅ 热重载成功: '+d.backend;this.saveOk=true;this.needApply=false;}else{this.saveMsg='❌ '+d.error;this.saveOk=false;}}catch(e){this.saveMsg='❌ '+e.message;this.saveOk=false;}
+    },
+    async fullRestart(){
+      if(!confirm('重启进程？OneBot 连接会断开几秒。'))return;
+      try{await fetch(this.api('/restart'),{method:'POST',headers:this.headers()});}catch{}
+      this.saveMsg='♻ 正在重启…页面几秒后会自动恢复';this.saveOk=true;
+      setTimeout(()=>location.reload(),5000);
     },
 
-    async fetchStatus() {
-      try {
-        const r = await fetch(this.api('/status'), { headers: this.headers() });
-        if (r.status === 401) return false;
-        this.status = await r.json();
-        return true;
-      } catch { return false; }
-    },
+    async resetSession(key){if(!confirm('重置会话 '+key+'？'))return;try{await fetch(this.api('/sessions/reset'),{method:'POST',headers:this.headers(),body:JSON.stringify({key})});this.fetchSessions();}catch{}},
+    async sendTest(){if(!this.testMsg.trim())return;this.testLoading=true;this.testResult='';try{const r=await fetch(this.api('/test'),{method:'POST',headers:this.headers(),body:JSON.stringify({message:this.testMsg})});const d=await r.json();this.testOk=d.ok;this.testResult=d.ok?'✅ '+(d.text||'').substring(0,300):'❌ '+(d.error||'未知错误');}catch(e){this.testOk=false;this.testResult='❌ '+e.message;}this.testLoading=false;},
 
-    async fetchMessages() {
-      try {
-        const r = await fetch(this.api('/messages?limit=50'), { headers: this.headers() });
-        if (r.ok) {
-          const d = await r.json();
-          const prev = this.messages.length;
-          this.messages = (d.messages || []).map(m => ({
-            ts: m.ts,
-            direction: m.direction || 'in',
-            user: m.user || '',
-            text: m.text || ''
-          }));
-          if (this.messages.length > prev) {
-            this.$nextTick(() => { if (this.$refs.msgBox) this.$refs.msgBox.scrollTop = this.$refs.msgBox.scrollHeight; });
-          }
-        }
-      } catch {}
-    },
-
-    async fetchSessions() {
-      try {
-        const r = await fetch(this.api('/sessions'), { headers: this.headers() });
-        if (r.ok) this.sessions = (await r.json()).sessions || [];
-      } catch {}
-    },
-
-    async fetchConfig() {
-      try {
-        const r = await fetch(this.api('/config'), { headers: this.headers() });
-        if (r.ok) {
-          const d = await r.json();
-          this.flatConfig = this._flatten(d);
-        }
-      } catch {}
-    },
-
-    async resetSession(key) {
-      if (!confirm('重置会话 ' + key + '？')) return;
-      try {
-        await fetch(this.api('/sessions/reset'), { method: 'POST', headers: this.headers(), body: JSON.stringify({ key }) });
-        this.fetchSessions();
-      } catch {}
-    },
-
-    async sendTest() {
-      if (!this.testMsg.trim()) return;
-      this.testLoading = true;
-      this.testResult = '';
-      try {
-        const r = await fetch(this.api('/test'), {
-          method: 'POST', headers: this.headers(),
-          body: JSON.stringify({ message: this.testMsg })
-        });
-        const d = await r.json();
-        this.testOk = d.ok;
-        this.testResult = d.ok ? ('✅ ' + (d.text || '').substring(0, 300)) : ('❌ ' + (d.error || '未知错误'));
-      } catch(e) { this.testOk = false; this.testResult = '❌ ' + e.message; }
-      this.testLoading = false;
-    },
-
-    startPolling() {
-      this.fetchStatus();
-      this.fetchSessions();
-      this.fetchConfig();
-      this.fetchMessages();
-      this._pollTimer = setInterval(() => {
-        this.fetchStatus();
-        this.fetchSessions();
-        this.fetchMessages();
-      }, 3000);
-      setInterval(() => this.fetchConfig(), 30000);
-    },
-
-    stopPolling() {
-      if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; }
-    },
-
-    fmtDuration(s) {
-      if (!s) return '—';
-      const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
-      return h > 0 ? h + 'h ' + m + 'm' : m + 'm';
-    },
-
-    fmtTime(ts) {
-      if (!ts) return '';
-      const d = new Date(ts * 1000);
-      return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0') + ':' + d.getSeconds().toString().padStart(2,'0');
-    },
-
-    _flatten(obj, prefix = '') {
-      const out = {};
-      for (const [k, v] of Object.entries(obj)) {
-        const key = prefix ? prefix + '.' + k : k;
-        if (v && typeof v === 'object' && !Array.isArray(v)) Object.assign(out, this._flatten(v, key));
-        else out[key] = String(v);
-      }
-      return out;
-    }
+    startPolling(){this.fetchStatus();this.fetchSessions();this.fetchConfigRaw();this.fetchMessages();this._poll=setInterval(()=>{this.fetchStatus();this.fetchSessions();this.fetchMessages();},3000);setInterval(()=>this.fetchConfigRaw(),30000);},
+    stopPolling(){if(this._poll){clearInterval(this._poll);this._poll=null;}},
+    fmtDuration(s){if(!s)return'—';const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h>0?h+'h '+m+'m':m+'m';},
+    fmtTime(ts){if(!ts)return'';const d=new Date(ts*1000);return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0')+':'+d.getSeconds().toString().padStart(2,'0');},
   };
 }
 </script>
