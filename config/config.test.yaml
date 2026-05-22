@@ -21,7 +21,7 @@ permissions:
   whitelist_groups: []
   blacklist_users: []
   blacklist_groups: []
-  group_require_at: false
+  group_require_at: true
 session:
   scope: per_chat
   timeout: 1800

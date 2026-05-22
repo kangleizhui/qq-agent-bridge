@@ -227,13 +227,25 @@ class WebUIServer:
         return web.json_response({"ok": True})  # unreachable
 
     async def _api_reload(self, request: web.Request) -> web.Response:
-        """热重载后端（重建 backend 实例，OneBot 连接不断）"""
+        """热重载后端 + 权限 + 会话配置（OneBot 连接不断）"""
         try:
             await self.bridge.backend.shutdown()
             from .backends import create_backend
-            self.bridge.backend = create_backend(self.bridge.config.get("backend", "openai"), self.bridge.config)
+            from .permissions import PermissionChecker
+            from .session import SessionManager
+            cfg = self.bridge.config
+            self.bridge.backend = create_backend(cfg.get("backend", "openai"), cfg)
             await self.bridge.backend.start()
-            log.info("WebUI 热重载后端完成: %s", self.bridge.backend.name)
+            self.bridge.perms = PermissionChecker(cfg.get("permissions", {}))
+            self.bridge.group_require_at = self.bridge.perms.group_require_at
+            # 会话配置也重建（scope/timeout 改了能生效）
+            self.bridge.sessions = SessionManager(
+                scope=cfg.get("session", {}).get("scope", "per_chat"),
+                timeout=cfg.get("session", {}).get("timeout", 1800),
+                history_turns=cfg.get("session", {}).get("history_turns", 10),
+            )
+            log.info("WebUI 热重载完成: backend=%s, allow_all=%s, group_require_at=%s",
+                     self.bridge.backend.name, self.bridge.perms.allow_all, self.bridge.perms.group_require_at)
             return web.json_response({"ok": True, "backend": self.bridge.backend.name})
         except Exception as e:
             log.exception("热重载失败")
