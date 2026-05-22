@@ -1,0 +1,41 @@
+onebot:
+  ws_host: "0.0.0.0"
+  ws_port: 8080
+  ws_path: "/onebot/v11/ws"
+  access_token: "test-token-webui"
+  self_id: "3531314097"
+
+backend: "openai"
+
+backends:
+  openai:
+    base_url: "https://ark.cn-beijing.volces.com/api/coding/v3"
+    api_key: "ark-c89dae19-f80e-4983-aa7c-c4062b62b945-2fb68"
+    model: "deepseek-v4-pro"
+    system_prompt: "你是一个QQ机器人助手，回答简洁。"
+    temperature: 0.7
+    max_tokens: 500
+
+permissions:
+  owners: ["2556208918"]
+  allow_all: true
+  whitelist_users: []
+  whitelist_groups: []
+  blacklist_users: []
+  blacklist_groups: []
+  group_require_at: false
+
+session:
+  scope: "per_chat"
+  timeout: 1800
+  history_turns: 5
+
+advanced:
+  max_concurrent: 3
+  long_output: "split"
+  long_output_threshold: 2000
+  log_level: "INFO"
+
+webui:
+  username: "admin"
+  password: "admin"

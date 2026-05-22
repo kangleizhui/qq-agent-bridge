@@ -4,7 +4,7 @@ qq-agent-bridge 主程序
 启动顺序：
   1. 加载 config.yaml
   2. 创建后端（hermes/openclaude/claude-code/openai）
-  3. 启动 OneBot WS 服务器
+  3. 创建 aiohttp app，OneBot WS + WebUI 共用同一个 app（同端口）
   4. 等 NapCat 连接
   5. 收到消息 → 权限检查 → 路由到后端 → 回复
 """
@@ -14,16 +14,19 @@ import os
 import re
 import signal
 import sys
+import time
 from pathlib import Path
 from typing import Dict, Any
 
 import yaml
+from aiohttp import web
 
 from .backends import create_backend
 from .backends.base import ChatContext
 from .session import SessionManager
 from .permissions import PermissionChecker
 from .onebot import OneBotServer
+from .webui import WebUIServer
 
 log = logging.getLogger("qq-agent-bridge")
 
@@ -57,6 +60,7 @@ class Bridge:
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.self_id = str(config["onebot"]["self_id"])
+        self._start_ts = time.time()
 
         backend_name = config.get("backend", "openai")
         log.info("初始化后端: %s", backend_name)
@@ -69,6 +73,13 @@ class Bridge:
         )
         self.perms = PermissionChecker(config.get("permissions", {}))
 
+        self.group_require_at = self.perms.group_require_at
+        self._semaphore = asyncio.Semaphore(config.get("advanced", {}).get("max_concurrent", 5))
+
+        # ── 共用 aiohttp app（OneBot WS + WebUI 同端口）──
+        self.app = web.Application()
+
+        # OneBot WS
         self.onebot = OneBotServer(
             host=config["onebot"].get("ws_host", "0.0.0.0"),
             port=config["onebot"].get("ws_port", 8080),
@@ -77,15 +88,38 @@ class Bridge:
             on_message=self._handle_message,
         )
 
-        self.group_require_at = self.perms.group_require_at
-        self._semaphore = asyncio.Semaphore(config.get("advanced", {}).get("max_concurrent", 5))
+        # WebUI
+        webui_cfg = config.get("webui", {})
+        self.webui = WebUIServer(
+            bridge=self,
+            username=webui_cfg.get("username", "admin"),
+            password=webui_cfg.get("password", "admin"),
+        )
 
     async def start(self) -> None:
         await self.backend.start()
-        await self.onebot.start()
+
+        # 注册路由到共用 app
+        self.app.router.add_get(self.onebot.path, self.onebot._handle_ws)
+        self.webui.attach(self.app, prefix="/webui")
+
+        # 启动 HTTP 服务
+        self._runner = web.AppRunner(self.app)
+        await self._runner.setup()
+        site = web.TCPSite(
+            self._runner,
+            self.onebot.host,
+            self.onebot.port,
+        )
+        await site.start()
+        log.info(
+            "服务已启动 → http://%s:%d  (OneBot WS: %s | WebUI: /webui)",
+            self.onebot.host, self.onebot.port, self.onebot.path,
+        )
 
     async def stop(self) -> None:
-        await self.onebot.stop()
+        if hasattr(self, "_runner"):
+            await self._runner.cleanup()
         await self.backend.shutdown()
 
     async def _handle_message(self, event: Dict[str, Any]) -> None:
@@ -149,9 +183,12 @@ class Bridge:
         self.sessions.get(ctx)
 
         log.info("→ [%s] %s (%s): %s", chat_kind, nickname, user_id, cleaned_text[:80])
+        self.webui.message_log.add(direction="in", user=nickname, text=cleaned_text[:500])
+
         resp = await self.backend.ask(cleaned_text, ctx)
 
         if resp.error:
+            self.webui.message_log.add(direction="err", text=resp.error[:500])
             await self._reply(ctx, f"❌ {resp.error}")
             return
 
@@ -159,6 +196,7 @@ class Bridge:
             return
 
         self.sessions.record(ctx, cleaned_text, resp.text)
+        self.webui.message_log.add(direction="out", text=resp.text[:500])
         await self._reply(ctx, resp.text)
 
     async def _reply(self, ctx: ChatContext, text: str) -> None:

@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QAB Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap');
+  body { font-family: 'JetBrains Mono', monospace; }
+  .glow { box-shadow: 0 0 15px rgba(99,102,241,0.3); }
+  .glow-green { box-shadow: 0 0 12px rgba(34,197,94,0.4); }
+  .glow-red { box-shadow: 0 0 12px rgba(239,68,68,0.4); }
+  .msg-in { border-left: 3px solid #6366f1; }
+  .msg-out { border-left: 3px solid #22c55e; }
+  .msg-err { border-left: 3px solid #ef4444; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #1e1e2e; }
+  ::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+  .pulse-dot { animation: pulse 2s infinite; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .fade-in { animation: fadeIn 0.3s ease-in; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        dark: { 900: '#0d0d14', 800: '#141420', 700: '#1a1a2e', 600: '#22223a', 500: '#2a2a44' },
+        accent: '#6366f1',
+      }
+    }
+  }
+}
+</script>
+</head>
+<body class="bg-dark-900 text-gray-200 min-h-screen" x-data="app()" x-init="init()">
+
+<!-- ═══ LOGIN ═══ -->
+<div x-show="!token" x-transition class="min-h-screen flex items-center justify-center">
+  <div class="bg-dark-700 p-8 rounded-2xl glow w-96">
+    <div class="text-center mb-8">
+      <div class="text-4xl mb-2">🤖</div>
+      <h1 class="text-2xl font-bold text-indigo-400">QAB Dashboard</h1>
+      <p class="text-sm text-gray-500 mt-1">qq-agent-bridge 控制台</p>
+    </div>
+    <form @submit.prevent="login()" class="space-y-4">
+      <div>
+        <label class="text-xs text-gray-500 uppercase tracking-wider">用户名</label>
+        <input x-model="form.user" type="text" autofocus
+          class="w-full mt-1 px-4 py-2.5 bg-dark-800 border border-dark-500 rounded-lg focus:border-indigo-500 focus:outline-none transition">
+      </div>
+      <div>
+        <label class="text-xs text-gray-500 uppercase tracking-wider">密码</label>
+        <input x-model="form.pass" type="password"
+          class="w-full mt-1 px-4 py-2.5 bg-dark-800 border border-dark-500 rounded-lg focus:border-indigo-500 focus:outline-none transition">
+      </div>
+      <div x-show="loginError" x-text="loginError" class="text-red-400 text-sm" x-transition></div>
+      <button type="submit" :disabled="loginLoading"
+        class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-lg font-semibold transition">
+        <span x-show="!loginLoading">登 录</span>
+        <span x-show="loginLoading">⏳</span>
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ═══ DASHBOARD ═══ -->
+<div x-show="token" x-transition class="min-h-screen flex flex-col">
+
+  <!-- TOP BAR -->
+  <header class="bg-dark-800 border-b border-dark-600 px-6 py-3 flex items-center justify-between shrink-0">
+    <div class="flex items-center gap-3">
+      <span class="text-xl">🤖</span>
+      <span class="text-lg font-bold text-indigo-400">QAB</span>
+      <span class="text-xs text-gray-500">Dashboard v0.1.0</span>
+    </div>
+    <div class="flex items-center gap-4">
+      <!-- connection indicator -->
+      <div class="flex items-center gap-2 text-sm">
+        <span class="w-2 h-2 rounded-full" :class="status.onebot_connected ? 'bg-green-500 glow-green pulse-dot' : 'bg-red-500 glow-red'"></span>
+        <span :class="status.onebot_connected ? 'text-green-400' : 'text-red-400'"
+              x-text="status.onebot_connected ? 'OneBot 已连接' : 'OneBot 未连接'"></span>
+      </div>
+      <button @click="logout()" class="text-xs text-gray-500 hover:text-red-400 transition">登出</button>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <div class="flex flex-1 overflow-hidden">
+
+    <!-- LEFT: Status + Sessions -->
+    <aside class="w-72 bg-dark-800 border-r border-dark-600 flex flex-col shrink-0 overflow-y-auto">
+      <!-- STATUS CARDS -->
+      <div class="p-4 space-y-3">
+        <h2 class="text-xs text-gray-500 uppercase tracking-wider mb-2">系 统 状 态</h2>
+
+        <div class="bg-dark-700 rounded-xl p-3 space-y-2">
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-400">后端</span>
+            <span class="text-indigo-400 font-semibold" x-text="status.backend || '—'"></span>
+          </div>
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-400">Bot QQ</span>
+            <span class="text-gray-200" x-text="status.self_id || '—'"></span>
+          </div>
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-400">活跃会话</span>
+            <span class="text-cyan-400 font-semibold" x-text="status.session_count ?? '—'"></span>
+          </div>
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-400">运行时间</span>
+            <span class="text-gray-200" x-text="fmtDuration(status.uptime_seconds)"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SESSIONS -->
+      <div class="p-4 flex-1 overflow-y-auto">
+        <h2 class="text-xs text-gray-500 uppercase tracking-wider mb-2">会 话 列 表</h2>
+        <template x-for="s in sessions" :key="s.key">
+          <div class="bg-dark-700 rounded-lg p-2.5 mb-2 hover:bg-dark-600 transition cursor-default group">
+            <div class="flex justify-between items-center">
+              <span class="text-xs text-gray-300 truncate flex-1" x-text="s.key"></span>
+              <button @click="resetSession(s.key)" class="text-xs text-gray-600 group-hover:text-red-400 transition ml-2"
+                      title="重置此会话">✕</button>
+            </div>
+            <div class="flex gap-3 mt-1 text-xs text-gray-500">
+              <span x-text="s.turns + ' 轮'"></span>
+              <span x-text="s.history_size + ' 条历史'"></span>
+              <span x-text="fmtTime(s.last_active)"></span>
+            </div>
+          </div>
+        </template>
+        <div x-show="sessions.length === 0" class="text-xs text-gray-600 text-center py-4">暂无活跃会话</div>
+      </div>
+    </aside>
+
+    <!-- CENTER: Message Stream -->
+    <main class="flex-1 flex flex-col overflow-hidden">
+      <div class="px-4 py-2 border-b border-dark-600 flex items-center justify-between shrink-0">
+        <h2 class="text-xs text-gray-500 uppercase tracking-wider">实 时 消 息 流</h2>
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-gray-600" x-text="messages.length + ' 条'"></span>
+          <button @click="messages=[]" class="text-xs text-gray-600 hover:text-red-400 transition">清空</button>
+        </div>
+      </div>
+      <div x-ref="msgBox" class="flex-1 overflow-y-auto p-4 space-y-2">
+        <template x-for="(m, i) in messages" :key="i">
+          <div class="rounded-lg p-3 text-sm fade-in"
+               :class="m.direction === 'in' ? 'msg-in bg-dark-700' : m.direction === 'err' ? 'msg-err bg-dark-700' : 'msg-out bg-dark-700'">
+            <div class="flex justify-between items-center mb-1">
+              <span class="text-xs font-semibold"
+                    :class="m.direction === 'in' ? 'text-indigo-400' : m.direction === 'err' ? 'text-red-400' : 'text-green-400'"
+                    x-text="m.direction === 'in' ? '← ' + (m.user || 'user') : m.direction === 'err' ? '⚠ ERROR' : '→ bot'"></span>
+              <span class="text-xs text-gray-600" x-text="fmtTime(m.ts)"></span>
+            </div>
+            <div class="text-gray-300 whitespace-pre-wrap break-all" x-text="m.text"></div>
+          </div>
+        </template>
+        <div x-show="messages.length === 0" class="text-center text-gray-600 text-sm py-20">
+          等待消息中…<br><span class="text-xs">通过 QQ 给机器人发条消息试试</span>
+        </div>
+      </div>
+
+      <!-- TEST BAR -->
+      <div class="border-t border-dark-600 p-3 shrink-0">
+        <form @submit.prevent="sendTest()" class="flex gap-2">
+          <input x-model="testMsg" type="text" placeholder="测试发送消息…"
+            class="flex-1 px-4 py-2 bg-dark-800 border border-dark-500 rounded-lg text-sm focus:border-indigo-500 focus:outline-none transition">
+          <button type="submit" :disabled="testLoading"
+            class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-lg text-sm font-semibold transition">
+            <span x-show="!testLoading">发送</span>
+            <span x-show="testLoading">⏳</span>
+          </button>
+        </form>
+        <div x-show="testResult" x-text="testResult" class="mt-2 text-xs p-2 rounded-lg"
+             :class="testOk ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'" x-transition></div>
+      </div>
+    </main>
+
+    <!-- RIGHT: Config -->
+    <aside class="w-80 bg-dark-800 border-l border-dark-600 flex flex-col shrink-0 overflow-y-auto">
+      <div class="px-4 py-2 border-b border-dark-600">
+        <h2 class="text-xs text-gray-500 uppercase tracking-wider">配 置 查 看</h2>
+      </div>
+      <div class="p-4 flex-1 overflow-y-auto">
+        <template x-for="(val, key) in flatConfig" :key="key">
+          <div class="mb-2">
+            <span class="text-xs text-gray-500" x-text="key"></span>
+            <div class="text-sm text-gray-300 mt-0.5 break-all" x-text="val"></div>
+          </div>
+        </template>
+        <div x-show="Object.keys(flatConfig).length === 0" class="text-xs text-gray-600 text-center py-4">加载中…</div>
+      </div>
+    </aside>
+
+  </div>
+</div>
+
+<script>
+function app() {
+  return {
+    token: localStorage.getItem('qab_token') || '',
+    form: { user: '', pass: '' },
+    loginLoading: false,
+    loginError: '',
+    status: {},
+    messages: [],
+    sessions: [],
+    flatConfig: {},
+    testMsg: '',
+    testLoading: false,
+    testResult: '',
+    testOk: false,
+    _pollTimer: null,
+
+    async init() {
+      if (this.token) {
+        const ok = await this.fetchStatus();
+        if (!ok) { this.token = ''; localStorage.removeItem('qab_token'); return; }
+        this.startPolling();
+      }
+    },
+
+    api(path) { return '/webui/api' + path; },
+    headers() { return { 'Authorization': 'Bearer ' + this.token, 'Content-Type': 'application/json' }; },
+
+    async login() {
+      this.loginLoading = true;
+      this.loginError = '';
+      try {
+        const r = await fetch(this.api('/login'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: this.form.user, password: this.form.pass })
+        });
+        const d = await r.json();
+        if (d.ok) {
+          this.token = d.token;
+          localStorage.setItem('qab_token', d.token);
+          this.startPolling();
+        } else {
+          this.loginError = d.error || '登录失败';
+        }
+      } catch(e) { this.loginError = '网络错误'; }
+      this.loginLoading = false;
+    },
+
+    logout() {
+      this.token = '';
+      localStorage.removeItem('qab_token');
+      this.stopPolling();
+    },
+
+    async fetchStatus() {
+      try {
+        const r = await fetch(this.api('/status'), { headers: this.headers() });
+        if (r.status === 401) return false;
+        this.status = await r.json();
+        return true;
+      } catch { return false; }
+    },
+
+    async fetchMessages() {
+      try {
+        const r = await fetch(this.api('/messages?limit=50'), { headers: this.headers() });
+        if (r.ok) {
+          const d = await r.json();
+          const prev = this.messages.length;
+          this.messages = (d.messages || []).map(m => ({
+            ts: m.ts,
+            direction: m.direction || 'in',
+            user: m.user || '',
+            text: m.text || ''
+          }));
+          if (this.messages.length > prev) {
+            this.$nextTick(() => { if (this.$refs.msgBox) this.$refs.msgBox.scrollTop = this.$refs.msgBox.scrollHeight; });
+          }
+        }
+      } catch {}
+    },
+
+    async fetchSessions() {
+      try {
+        const r = await fetch(this.api('/sessions'), { headers: this.headers() });
+        if (r.ok) this.sessions = (await r.json()).sessions || [];
+      } catch {}
+    },
+
+    async fetchConfig() {
+      try {
+        const r = await fetch(this.api('/config'), { headers: this.headers() });
+        if (r.ok) {
+          const d = await r.json();
+          this.flatConfig = this._flatten(d);
+        }
+      } catch {}
+    },
+
+    async resetSession(key) {
+      if (!confirm('重置会话 ' + key + '？')) return;
+      try {
+        await fetch(this.api('/sessions/reset'), { method: 'POST', headers: this.headers(), body: JSON.stringify({ key }) });
+        this.fetchSessions();
+      } catch {}
+    },
+
+    async sendTest() {
+      if (!this.testMsg.trim()) return;
+      this.testLoading = true;
+      this.testResult = '';
+      try {
+        const r = await fetch(this.api('/test'), {
+          method: 'POST', headers: this.headers(),
+          body: JSON.stringify({ message: this.testMsg })
+        });
+        const d = await r.json();
+        this.testOk = d.ok;
+        this.testResult = d.ok ? ('✅ ' + (d.text || '').substring(0, 300)) : ('❌ ' + (d.error || '未知错误'));
+      } catch(e) { this.testOk = false; this.testResult = '❌ ' + e.message; }
+      this.testLoading = false;
+    },
+
+    startPolling() {
+      this.fetchStatus();
+      this.fetchSessions();
+      this.fetchConfig();
+      this.fetchMessages();
+      this._pollTimer = setInterval(() => {
+        this.fetchStatus();
+        this.fetchSessions();
+        this.fetchMessages();
+      }, 3000);
+      setInterval(() => this.fetchConfig(), 30000);
+    },
+
+    stopPolling() {
+      if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; }
+    },
+
+    fmtDuration(s) {
+      if (!s) return '—';
+      const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
+      return h > 0 ? h + 'h ' + m + 'm' : m + 'm';
+    },
+
+    fmtTime(ts) {
+      if (!ts) return '';
+      const d = new Date(ts * 1000);
+      return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0') + ':' + d.getSeconds().toString().padStart(2,'0');
+    },
+
+    _flatten(obj, prefix = '') {
+      const out = {};
+      for (const [k, v] of Object.entries(obj)) {
+        const key = prefix ? prefix + '.' + k : k;
+        if (v && typeof v === 'object' && !Array.isArray(v)) Object.assign(out, this._flatten(v, key));
+        else out[key] = String(v);
+      }
+      return out;
+    }
+  };
+}
+</script>
+</body>
+</html>

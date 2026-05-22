@@ -98,3 +98,9 @@ advanced:
 
   # 日志级别
   log_level: "INFO"
+
+# ── WebUI 仪表盘 ────────────────────────────
+webui:
+  # 登录凭据（默认 admin/admin，生产环境请改掉）
+  username: "admin"
+  password: "admin"
