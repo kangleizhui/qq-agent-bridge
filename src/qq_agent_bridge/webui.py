@@ -91,9 +91,11 @@ class WebUIServer:
         app.router.add_get(f"{prefix}/api/config/raw", self._require_auth(self._api_get_config_raw))
         app.router.add_post(f"{prefix}/api/config", self._require_auth(self._api_save_config))
         app.router.add_post(f"{prefix}/api/test", self._require_auth(self._api_test))
+        app.router.add_post(f"{prefix}/api/test-connection", self._require_auth(self._api_test_connection))
         app.router.add_post(f"{prefix}/api/restart", self._require_auth(self._api_restart))
         app.router.add_post(f"{prefix}/api/reload", self._require_auth(self._api_reload))
         app.router.add_get(f"{prefix}/api/napcat-snippet", self._require_auth(self._api_napcat_snippet))
+        app.router.add_get(f"{prefix}/api/backends", self._require_auth(self._api_list_backends))
 
     # ── 页面 ────────────────────────────────
     async def _index(self, request: web.Request) -> web.Response:
@@ -279,3 +281,78 @@ class WebUIServer:
             return web.json_response({"ok": True, "text": resp.text, "error": resp.error})
         except Exception as e:
             return web.json_response({"ok": False, "error": str(e)}, status=500)
+
+    async def _api_test_connection(self, request: web.Request) -> web.Response:
+        """测试 base_url + api_key 能否连通（探测 /v1/models），不需要保存配置。"""
+        data = await request.json()
+        backend_name = (data.get("backend") or "").lower().strip()
+        base_url = data.get("base_url", "").strip()
+        api_key = data.get("api_key", "").strip()
+
+        # 如果传来的 api_key 是 ***（脱敏），用当前实例的真实 key
+        if api_key == "***":
+            current = self.bridge.config.get("backends", {}).get(backend_name, {})
+            api_key = current.get("api_key", "")
+
+        if not base_url:
+            return web.json_response({"ok": False, "message": "base_url 必填"}, status=400)
+
+        from .backends import _REGISTRY
+        cls = _REGISTRY.get(backend_name)
+        if cls is None or not hasattr(cls, "test_connection"):
+            return web.json_response(
+                {"ok": False, "message": f"后端 '{backend_name}' 不支持连接测试"}, status=400
+            )
+
+        try:
+            ok, msg = await cls.test_connection(base_url, api_key)
+            return web.json_response({"ok": ok, "message": msg})
+        except Exception as e:
+            return web.json_response({"ok": False, "message": f"测试失败: {type(e).__name__}: {e}"}, status=500)
+
+    async def _api_list_backends(self, request: web.Request) -> web.Response:
+        """列出所有可用后端 + 元数据（供 WebUI 后端选择下拉框）。"""
+        from .backends import list_backends
+        backends_meta = {
+            "hermes": {
+                "label": "Hermes（远程 Gateway）",
+                "description": "连接远程 Hermes Gateway 的 OpenAI 兼容 API（端口 8642）",
+                "fields": [
+                    {"name": "base_url", "label": "Hermes Gateway URL", "placeholder": "http://1.2.3.4:8642/v1", "required": True},
+                    {"name": "api_key", "label": "API Key", "placeholder": "Hermes 那边 platforms.api_server.extra.key", "required": True, "sensitive": True},
+                    {"name": "model", "label": "Model 名", "placeholder": "hermes-agent", "default": "hermes-agent"},
+                    {"name": "system_prompt", "label": "System Prompt", "default": "你是一个 QQ 助手。", "textarea": True},
+                    {"name": "temperature", "label": "Temperature", "type": "number", "default": 0.7, "step": 0.1},
+                    {"name": "max_tokens", "label": "Max Tokens", "type": "number", "default": 2000},
+                ],
+                "setup_hint": (
+                    "在远程 Hermes 服务器：\n"
+                    "1. config.yaml 启用 api_server platform（端口 8642）\n"
+                    "2. 配置 platforms.api_server.extra.key 作为 API Key\n"
+                    "3. 重启 hermes-gateway"
+                ),
+            },
+            "openclaw": {
+                "label": "OpenClaw（远程 Gateway）",
+                "description": "连接远程 OpenClaw Gateway 的 OpenAI 兼容 API",
+                "fields": [
+                    {"name": "base_url", "label": "OpenClaw Gateway URL", "placeholder": "http://1.2.3.4:5757", "required": True, "hint": "自动补 /v1"},
+                    {"name": "api_key", "label": "Gateway Token / Password", "placeholder": "gateway.auth.token", "required": True, "sensitive": True},
+                    {"name": "model", "label": "Agent Target", "placeholder": "openclaw 或 openclaw/<agentId>", "default": "openclaw"},
+                    {"name": "temperature", "label": "Temperature", "type": "number", "default": 0.7, "step": 0.1},
+                    {"name": "max_tokens", "label": "Max Tokens", "type": "number", "default": 4000},
+                ],
+                "setup_hint": (
+                    "在远程 OpenClaw 服务器：\n"
+                    "1. ~/.openclaw/config.json5 启用：\n"
+                    '   gateway: { auth: { mode: "token", token: "your-secret" },\n'
+                    "             http: { endpoints: { chatCompletions: { enabled: true } } } }\n"
+                    "2. 重启 openclaw gateway"
+                ),
+            },
+        }
+        return web.json_response({
+            "backends": list_backends(),
+            "current": self.bridge.config.get("backend", ""),
+            "meta": backends_meta,
+        })
